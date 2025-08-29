@@ -66,6 +66,6 @@ Xfa clk5 clk6 clk7 sum carry fa
 .plot clk6
 .plot clk7
 .plot out
-.plot out
+.plot out2
 .plot sum
 .plot carry
