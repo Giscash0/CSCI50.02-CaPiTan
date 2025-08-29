@@ -53,10 +53,58 @@
     Xsub6 x y z c_out nand3
 .ends
 
-Xfx clk1 clk2 clk3 clk4 clk5 clk6 clk7 out fx
-Xfx2 clk1 clk2 clk3 clk4 clk5 clk6 clk7 out2 fx2
-Xfa clk5 clk6 clk7 sum carry fa
+*******************************************************************************
+* Full Adder (AND / OR / INVERTER version, =<3-input gates)
+* sum   = a ⊕ b ⊕ c_in
+*       = a!b!c_in + !ab!c_in + !a!bc_in + abc_in     by expanding XOR to SOP
+*
+* c_out = ab + ac_in + bc_in                          from k-map
+*       = !(!(ab + ac_in + bc_in))                    by double negation
+*       = !( !ab !ac_in !bc_in )                      by de Morgan's theorem
+*******************************************************************************
+.subckt fa2 a b c_in sum c_out
+    * inverters for complements
+    Xsub1 a     aN    inverter        * aN = !a
+    Xsub2 b     bN    inverter        * bN = !b
+    Xsub3 c_in  cN    inverter        * cN = !c_in
 
+    * sum path
+    Xsub4  a  bN cN   t1 and3         * t1 = a!b!c_in
+    Xsub5  aN b  cN   t2 and3         * t2 = !ab!c_in
+    Xsub6  aN bN c_in t3 and3         * t3 = !a!bc_in
+    Xsub7  a  b  c_in t4 and3         * t4 = abc_in
+    Xsub8  t1 t2     s1 or2           * partial OR
+    Xsub9  t3 t4     s2 or2           * partial OR
+    Xsub10 s1 s2     sum or2          * sum = t1 + t2 + t3 + t4
+
+    * carry path
+    Xsub11 a  b     u1 and2           * u1 = ab
+    Xsub12 a  c_in  u2 and2           * u2 = ac_in
+    Xsub13 b  c_in  u3 and2           * u3 = bc_in
+    Xsub14 u1 u2 u3 c_out or3         * c_out = ab + ac_in + bc_in
+.ends
+
+*******************************************************************************
+* fa and fa2 implement the same full adder; however, based on the graph,
+* fa is faster than fa2.
+*
+* fa uses two XOR2 stages (a⊕b then ⊕c_in) during its sum path. fa2 uses three to four stages,
+* (INV + AND3 + OR2 + OR2 for terms with complements), so fa’s sum switches earlier.
+* Both carry paths are two levels, but fa uses NAND2/NAND3 while fa2 uses AND2/OR3.
+* In CMOS, NAND gates generally have lower logical effort and shorter p-device stacks
+* than OR/NOR, so they are faster at the same fan-in.
+* Fewer stages and faster gate types make fa faster than fa2.
+*******************************************************************************
+* Instantiations
+*******************************************************************************
+Xfx   clk1 clk2 clk3 clk4 clk5 clk6 clk7 out    fx
+Xfx2  clk1 clk2 clk3 clk4 clk5 clk6 clk7 out2   fx2
+Xfa   clk5 clk6 clk7 sum  carry  fa
+Xfa2  clk5 clk6 clk7 sum2 carry2 fa2
+
+*******************************************************************************
+* Simulation Commands
+*******************************************************************************
 .tran 640ns
 .plot clk1
 .plot clk2
@@ -69,4 +117,5 @@ Xfa clk5 clk6 clk7 sum carry fa
 .plot out2
 .plot sum
 .plot carry
-
+.plot sum2
+.plot carry2
