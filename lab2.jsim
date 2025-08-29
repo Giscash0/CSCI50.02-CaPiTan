@@ -22,6 +22,22 @@
 .ends
 
 *******************************************************************************
+* OUT = ABC + DE + FG
+*******************************************************************************
+.subckt fx2 a b c d e f g out
+    Xsub1 a b c x and3
+    Xsub2 d e y and2
+    Xsub3 f g z and2
+    Xsub4 x y z out or3
+.ends
+
+*******************************************************************************
+* fx and fx2 used the same number of gates however based on the graph,
+* fx is faster than fx2. This clearly shows how NAND gates are faster than
+* AND and OR gates.
+*******************************************************************************
+
+*******************************************************************************
 * Full Adder
 * sum = a ⊕ b ⊕ c_in   from noticing in the truth table
 * c_out = ab + ac_in + bc_in   from k-map
@@ -38,6 +54,7 @@
 .ends
 
 Xfx clk1 clk2 clk3 clk4 clk5 clk6 clk7 out fx
+Xfx2 clk1 clk2 clk3 clk4 clk5 clk6 clk7 out2 fx
 Xfa clk5 clk6 clk7 sum carry fa
 
 .tran 640ns
@@ -48,6 +65,7 @@ Xfa clk5 clk6 clk7 sum carry fa
 .plot clk5
 .plot clk6
 .plot clk7
+.plot out
 .plot out
 .plot sum
 .plot carry
