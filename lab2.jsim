@@ -54,7 +54,7 @@
 .ends
 
 Xfx clk1 clk2 clk3 clk4 clk5 clk6 clk7 out fx
-Xfx2 clk1 clk2 clk3 clk4 clk5 clk6 clk7 out2 fx
+Xfx2 clk1 clk2 clk3 clk4 clk5 clk6 clk7 out2 fx2
 Xfa clk5 clk6 clk7 sum carry fa
 
 .tran 640ns
@@ -69,3 +69,4 @@ Xfa clk5 clk6 clk7 sum carry fa
 .plot out2
 .plot sum
 .plot carry
+
