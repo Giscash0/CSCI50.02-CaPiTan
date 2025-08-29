@@ -1,0 +1,53 @@
+*******************************************************************************
+* LAB #2
+* - Carlos, Danny II
+* - Piscasio, Johannes
+* - Tan, Jacob
+*******************************************************************************
+
+.include "8clocks.jsim"
+.include "nominal.jsim"
+.include "stdcell.jsim"
+
+*******************************************************************************
+* OUT = ABC + DE + FG
+*     = !(!( ABC + DE + FG ))   by double negation
+*     = !( !(ABC)!(DE)!(FG) )   by de Morgan's theorem
+*******************************************************************************
+.subckt fx a b c d e f g out
+    Xsub1 a b c x nand3
+    Xsub2 d e y nand2
+    Xsub3 f g z nand2
+    Xsub4 x y z out nand3
+.ends
+
+*******************************************************************************
+* Full Adder
+* sum = a ⊕ b ⊕ c_in   from noticing in the truth table
+* c_out = ab + ac_in + bc_in   from k-map
+*       = !(!( ab + ac_in + bc_in ))   by double negation
+*       = !( !(ab)!(ac_in)!(bc_in) )   by de Morgan's theorem
+*******************************************************************************
+.subckt fa a b c_in sum c_out
+    Xsub1 a b c xor2
+    Xsub2 c c_in sum xor2
+    Xsub3 a b x nand2
+    Xsub4 a c_in y nand2
+    Xsub5 b c_in z nand2
+    Xsub6 x y z c_out nand3
+.ends
+
+Xfx clk1 clk2 clk3 clk4 clk5 clk6 clk7 out fx
+Xfa clk5 clk6 clk7 sum carry fa
+
+.tran 640ns
+.plot clk1
+.plot clk2
+.plot clk3
+.plot clk4
+.plot clk5
+.plot clk6
+.plot clk7
+.plot out
+.plot sum
+.plot carry
