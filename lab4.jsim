@@ -1,7 +1,8 @@
 *******************************************************************************
-* As with the previous labs, replace this header comment with your names!
-* - Follow "Last Name, First Name" format.
-* - Sort alphabetically!
+* LAB #4
+* - Carlos, Danny II
+* - Piscasio, Johannes
+* - Tan, Jacob
 *******************************************************************************
 
 .include "8clocks.jsim"
@@ -12,17 +13,15 @@
 * Plug-in your full adder and 32-bit ripple-carry adder subcircuits here.
 *******************************************************************************
 .subckt fa a b c_in sum c_out
-  ********
-  * Replace these comments with your code.
-  ********
+  Xsum1 a b out1 xor2
+	 Xsum2 out1 c_in sum xor2
+	 Xcarry1 a b out2 nand2
+	 Xcarry2 c_in out1 out3 nand2
+	 Xcarry3 out2 out3 c_out nand2
 .ends
 
 .subckt add32 a[31:0] b[31:0] cin0 sum[31:0] cout[31:30]
-  ********
-  * Replace these comments with your code.
-  * Strictly follow the order of the operands here, or you may have trouble
-  * for later circuits!
-  ********
+  Xbits a[31:0] b[31:0] cout[30:0] cin0 sum[31:0] cout[31:0] fa
 .ends
 
 *******************************************************************************
