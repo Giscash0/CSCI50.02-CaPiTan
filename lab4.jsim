@@ -28,9 +28,9 @@
 * Your new counter32 subcircuit code should go here.
 *******************************************************************************
 .subckt counter32 reset a[31:0] f[31:0] clk
-  ********
-  * Replace these comments with your code.
-  ********
+  Xadd a[31:0] f[31:0] 0 sum[31:0] cout[31:30] add32
+  Xmux reset#32 sum[31:0] 0#32 mux_out[31:0] mux2
+  Xdrg mux_out[31:0] clk#32 f[31:0] dreg
 .ends
 
 *******************************************************************************
