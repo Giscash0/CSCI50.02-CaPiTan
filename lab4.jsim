@@ -105,6 +105,13 @@
 .ends
 
 *******************************************************************************
+* Super fast clock
+* The current fastest clock clk1 has a period of 10ns. We would like to try to
+* instantiate a clock with a period of 2ns.
+*******************************************************************************
+Vclk0 clk0 0 pulse(0,5,.9ns,.1ns,.1ns,.9ns)
+
+*******************************************************************************
 * Pitfall: DON'T use numbers AND iterators in your node names at the same time,
 *          e.g., temp[31:0] and temp2[31:0] will result in conflicts!
 *
@@ -146,6 +153,12 @@
 Xcounter32 reset incr[31:0] reg[31:0] clk1 counter32
 
 *******************************************************************************
+* We also instantiate a fast 32-bit counter using the fast clock that we
+* instantiated earlier. For simplicity, we reuse the same inputs.
+*******************************************************************************
+Xfast_counter32 reset incr[31:0] fast_reg[31:0] clk0 counter32
+
+*******************************************************************************
 * This "reset" waveform sets up a reset signal that has a delayed start of 15ns
 * and then goes to the next value every 50ns.
 * The values "1 0 0 0 1 0" indicate that the reset signal only turns on twice
@@ -178,6 +191,8 @@ Wincr incr[31:0] nrz(0, 5, 50ns, 0ns, 0.001ns, 0.001ns)
 .plot sd(incr[31:0])
 .plot clk1
 .plot sd(reg[31:0])
+.plot clk0
+.plot sd(fast_reg[31:0])
 
 *******************************************************************************
 * Increasing:   reg increases by incr on each rising edge of clk.wdaw
@@ -197,4 +212,11 @@ Wincr incr[31:0] nrz(0, 5, 50ns, 0ns, 0.001ns, 0.001ns)
 * If the sum of delays is greater than the clock period, the next 
 * rising edge will arrive before the outputs have stabilized.
 * This causes incorrect values to be latched and setup/hold time violations.
+*
+* An example of this is by looking at the plot of fast_reg[31:0], everything
+* looks fine until we have to add -1 (11111111 11111111 11111111 11111111).
+* The number is currently 92 (00000000 00000000 00000000 01011100) but the result
+* was -134217637 (11111000 00000000 00000000 01011011). 01011011 is 92 which is
+* the correct answer. The leftmost 5 bits are still being calculated but since
+* the clock was too fast, the incorrect sum was sent to the memory. 
 *******************************************************************************
