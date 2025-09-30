@@ -1,0 +1,79 @@
+*******************************************************************************
+* LAB #5
+* - Carlos, Danny II
+* - Piscasio, Johannes
+* - Tan, Jacob
+*******************************************************************************
+
+.include "8clocks.jsim"
+.include "nominal.jsim"
+.include "stdcell.jsim"
+
+*******************************************************************************
+* Full Adder
+*
+* Truth Table:
+* a b c_in sum c_out
+* 0 0  0    0    0
+* 0 0  1    1    0
+* 0 1  0    1    0
+* 0 1  1    0    1
+* 1 0  0    1    0
+* 1 0  1    0    1
+* 1 1  0    0    1
+* 1 1  1    1    1
+*
+* sum = !a!bc_in + !ab!c_in + a!b!c_in + abc_in   from the truth table
+*     = c_in(!a!b + ab) + !c_in(!ab + a!b)        by distributive law
+*     = c_in!(a⊕b) + !c_in(a⊕b)                 substituting to XOR
+*     = a ⊕ b ⊕ c_in                            substituting to XOR
+* c_out = !abc_in + a!bc_in + ab!c_in + abc_in    from the truth table
+*       = c_in(!ab + a!b) + ab(!c_in + c_in)      by distributive law
+*       = c_in(!ab + a!b) + ab(1)                 by complement law
+*       = c_in(!ab + a!b) + ab                    by identity law
+*       = ab + c_in(a⊕b)                         turn to xor because we already
+*                                                 know a⊕b from the sum
+*       = !(!(ab + c_in(a⊕b)))                   by double negation law
+*       = !(!(ab)!(c_in(a⊕b)))                   by De Morgan's theorem
+*******************************************************************************
+.subckt fa a b c_in sum c_out
+  Xsum1 a b out1 xor2
+	Xsum2 out1 c_in sum xor2
+	Xcarry1 a b out2 nand2
+	Xcarry2 c_in out1 out3 nand2
+	Xcarry3 out2 out3 c_out nand2
+.ends
+
+*******************************************************************************
+* 32-bit Full Adder
+* We instantiate 32 full adder and the carry ripples from the less significant
+* bit to the more significant bit. The ith full adder adds a_i and b_i with the
+* carry input being the carry output of the previous full adder, which is
+* c_out_i-1. Since the 0th fa doesn't have a previous fa, its carry input is
+* cin0. Thus, each bit instantiation goes like:
+*      Xbit#0 a31 b31 cout30 sum31 cout31 fa
+*      Xbit#1 a30 b30 cout29 sum30 cout30 fa
+*      ...
+*      Xbit#30 a1 b1 cout0 sum1 cout1 fa
+*      Xbit#31 a0 b0 cin0 sum0 cout0 fa
+*
+* However with the power of jsim, we can instantiate by:
+*      Xbits 32_a 32_b 31_prev_cout_then_least_bit's_cin 32_sum 32_carry_out fa
+*******************************************************************************
+.subckt add32 a[31:0] b[31:0] cin0 sum[31:0] cout[31:30]
+  Xbits a[31:0] b[31:0] cout[30:0] cin0 sum[31:0] cout[31:0] fa
+.ends
+
+*******************************************************************************
+* 32-bit Adder/Subtractor
+*******************************************************************************
+.subckt as32 a[31:0] b[31:0] op0 fas[31:0] n v z
+  *add code here
+.ends
+
+*******************************************************************************
+* 32-bit Comparator
+*******************************************************************************
+.subckt cmp32 n v z op[2:1] fcmp[31:0]
+  *add code here
+.ends
