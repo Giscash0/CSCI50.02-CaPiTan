@@ -66,9 +66,51 @@
 
 *******************************************************************************
 * 32-bit Adder/Subtractor
+* For inputs, we have a 32-bit A and B as well as the op0. The input op0 is 0
+* for addition and 1 for subtraction. We know that A - B = A + ~B + 1. We also
+* know that the constructor for the 32-bit Full Adder inputs a carry in bit for
+* the least significant bit. Thus, we can connect op0 to cin0 to handle the +1.
+*
+* For the ~B, we can just use a 2-input multiplexer where d0 = B, d1 = ~B, and
+* s = op0. This is so that when op0 = 0, indicating addition, what is being added
+* is just A + B(d0) + 0(op0) or A + B. Otherwise, when op0 = 1, indicating
+* subtraction, what is being added is A + ~B(d1) + 1(op0) or A - B.
+*
+* We have output n which is 0 if fas is positive and 1 if negative. We only need
+* to check fas31. The most significant bit of signed bits is 0 when it is positive
+* and 1 when it is negative. Therefore, n = fas31.
+* 
+* Output v is 1 when the operation result in a signed overflow or the value
+* "wrapped around". We notice that when the carry out of the 2 most significant
+* bits are not equal, there is an overflow. If they are equal, there is no
+* overflow. Putting that in a truth table, it is an exclusive or. Therefore,
+* v = cout31 ⊕ cout30
+*
+* Output z is 1 if all 32 bits fas[31:0] are 0, otherwise z is 0. This gives:
+*      z = !(fas31 + fas30 + ... + fas1 + fas0)
+* Grouping by 2 and grouping those groups by 2 and so on would result in 4 layers
+* of OR gates with the fifth layer as 1 NOR gate:
+*      z = !( ((fas31+fas30)+...+(fas17+fas16)) + ((fas15+fas14)+...+(fas1+fas0)) )
+* Suppose we double negate a 4 bit we have:
+*      F = !((A + B) + (C + D))
+*      F = !!!((A + B) + (C + D))
+*      F = !!(!(A + B) !(C + D))
+*      F = !(!!(A + B) + !!(C + D))
+*      F = !(!(!A !B) + !(!C !D))
 *******************************************************************************
 .subckt as32 a[31:0] b[31:0] op0 fas[31:0] n v z
-  *add code here
+  * nb# = ~b#
+  XinvertedB b[31:0] nb[31:0] inverter
+  * connect op0 to all mux
+  * if op0 = 0, newb# = b#
+  * else if op0 = 1, newb# = nb#
+  Xbmux op0#32 b[31:0] nb[31:0] newb[31:0] mux2
+  * we add a[31:0] and newb[31:0] using the 32-bit Adder with op0 as cin0
+  Xas a[31:0] newb[31:0] op0 fas[31:0] cout[31:30] add32
+  * since n = fas31, we connect them
+  .connect fas31 n
+  * we get XOR of cout31 and cout30 to get v
+  Xoverflow cout[31:30] v xor2
 .ends
 
 *******************************************************************************
