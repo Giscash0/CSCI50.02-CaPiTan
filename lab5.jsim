@@ -213,3 +213,23 @@ Wopclk op[2:0] nrz(0, 5, 20ns, 0ns, 0.001ns, 0.001ns)
 .plot op[2:0]
 .plot fas[31:0]
 .plot fcmp0
+.plot n
+.plot v
+.plot z
+
+*******************************************************************************
+* Critical Path
+*******************************************************************************
+* The critical path of the circuit begins at the input b[0], which first passes
+* through an inverter and a 2-to-1 multiplexer that selects between b[0] and 
+* ¬b[0] depending on the operation bit op0. From there the signal enters the 
+* 32-bit ripple-carry adder. The worst-case propagation delay occurs when the 
+* carry ripples through all 32 full adders up to the most significant bit.
+*
+* The output bits compute n, v, and z flags. Among these, z has the highest 
+* propagation delay since it passes through multiple stages of NOR and NAND
+* gates for zero detection. Finally, in the comparator (cmp32), the signal
+* from z propagates through an AND gate and an OR gate before reaching fcmp0.
+*
+* b[0] → inverter → mux2 → add32 → z → cmp32:AND w/ op1 → cmp32: OR w/ (op2 ∧ (n ⊕ v)) → fcmp0
+
