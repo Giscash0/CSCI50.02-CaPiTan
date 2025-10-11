@@ -181,9 +181,15 @@
 
 *******************************************************************************
 * 32-bit Bitwise Boolean Circuit
+* 4-Way Multiplexers are essentially programmable boolean gates. Using the
+* A-bit and B-bit as the selectors, the data inputs can just be the 1s and 0s
+* as if it was a truth table.
+*
+* The subcircuit's op inputs already determines the data inputs so the only
+* thing we need to instantiate are the 32 4-way multiplexers for each bit.
 *******************************************************************************
 .subckt bool32 a[31:0] b[31:0] op[3:0] fbool[31:0]
-  *input code
+  Xmuxes a[31:0] b[31:0] op3#32 op2#32 op1#32 op0#32 fbool[31:0] mux4
 .ends
 
 *******************************************************************************
