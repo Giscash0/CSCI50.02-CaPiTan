@@ -237,38 +237,21 @@
 
 *******************************************************************************
 * 32-bit Arithmetic Logic Unit
+* We instantiate all 4 functions and input a[31:0] b[31:0] alufn[3:0] to all the
+* functions while noting that cmp32 relies on as32 so their nvz must be connected.
+*
+* alufn[5:4] determines the type of function to do:
+*       00 - adder/subtractor (as32)
+*       01 - boolean (bool32)
+*       10 - shifter (shift32)
+*       11 - comparator (cmp32)
+* We use 32 4-way multiplexers with alufn[5:4] as selectors and the outputs of
+* the functions as the data inputs.
 *******************************************************************************
 .subckt alu32 a[31:0] b[31:0] alufn[5:0] f[31:0]
-  *input code
+  Xas a[31:0] b[31:0] alufn0 fas[31:0] n v z as32
+  Xbool a[31:0] b[31:0] alufn[3:0] fbool[31:0] bool32
+  Xshift a[31:0] b[4:0] alufn[1:0] fshift[31:0] shift32
+  Xcmp n v z alufn[2:1] fcmp[31:0] cmp32
+  Xtype alufn4#32 alufn5#32 fas[31:0] fbool[31:0] fshift[31:0] fcmp[31:0] f[31:0] mux4
 .ends
-
-
-
-Wa a[31:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
-+ 0x00000000 0x00000001 0x000000F0 0xF0000000
-+ 0xAAAAAAAA 0x80000000 0x7FFFFFFF 0xFFFFFFFF
-
-Wb b[4:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
-+ 0b00000 0b00001 0b00010 0b00100
-+ 0b01000 0b00001 0b00001 0b11111
-
-Wop op[1:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
-+ 0b00 0b00 0b01 0b11 0b00 0b11 0b01 0b00
-
-*******************************************************************************
-* DUT: Device Under Test
-*******************************************************************************
-
-Xshifter a[31:0] b[4:0] op[1:0] fshift[31:0] shift32
-
-*******************************************************************************
-* Simulation and plotting
-*******************************************************************************
-
-.tran 480ns
-.plot a[31:0]
-.plot b[4:0]
-.plot op[1:0]
-.plot fshift[31:0]
-
-.end
