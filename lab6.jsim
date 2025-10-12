@@ -25,16 +25,16 @@
 *
 * sum = !a!bc_in + !ab!c_in + a!b!c_in + abc_in   from the truth table
 *     = c_in(!a!b + ab) + !c_in(!ab + a!b)        by distributive law
-*     = c_in!(a⊕b) + !c_in(a⊕b)                 substituting to XOR
-*     = a ⊕ b ⊕ c_in                            substituting to XOR
+*     = c_in!(aâb) + !c_in(aâb)                 substituting to XOR
+*     = a â b â c_in                            substituting to XOR
 * c_out = !abc_in + a!bc_in + ab!c_in + abc_in    from the truth table
 *       = c_in(!ab + a!b) + ab(!c_in + c_in)      by distributive law
 *       = c_in(!ab + a!b) + ab(1)                 by complement law
 *       = c_in(!ab + a!b) + ab                    by identity law
-*       = ab + c_in(a⊕b)                         turn to xor because we already
-*                                                 know a⊕b from the sum
-*       = !(!(ab + c_in(a⊕b)))                   by double negation law
-*       = !(!(ab)!(c_in(a⊕b)))                   by De Morgan's theorem
+*       = ab + c_in(aâb)                         turn to xor because we already
+*                                                 know aâb from the sum
+*       = !(!(ab + c_in(aâb)))                   by double negation law
+*       = !(!(ab)!(c_in(aâb)))                   by De Morgan's theorem
 *******************************************************************************
 .subckt fa a b c_in sum c_out
   Xsum1 a b out1 xor2
@@ -84,7 +84,7 @@
 * "wrapped around". We notice that when the carry out of the 2 most significant
 * bits are not equal, there is an overflow. If they are equal, there is no
 * overflow. Putting that in a truth table, it is an exclusive or. Therefore,
-* v = cout31 ⊕ cout30
+* v = cout31 â cout30
 *
 * Output z is 1 if all 32 bits fas[31:0] are 0, otherwise z is 0.
 * Suppose we want to make 2 bits return 1 if both bits are 0:
@@ -157,12 +157,12 @@
 *      1001 - 0011: n=0 v=1 isless=1
 *      0011 - 0101: n=1 v=0 isless=1
 *      0111 - 1101: n=1 v=1 isless=0
-* We notice that isless = n⊕v. Therefore:
-*      fcmp0 = (op2)(n⊕v)
+* We notice that isless = nâv. Therefore:
+*      fcmp0 = (op2)(nâv)
 *
 * If both op1 and op2 are 1, then fcmp0=1 iff A<=B. This is read as less than
 * OR equal to. Therefore we add the first 2:
-*      fcmp0 = (op1)(z) + (op2)(n⊕v)
+*      fcmp0 = (op1)(z) + (op2)(nâv)
 *******************************************************************************
 .subckt cmp32 n v z op[2:1] fcmp[31:0]
   * we don't care about fcmp[31:1] so we connect it to ground
@@ -194,9 +194,45 @@
 
 *******************************************************************************
 * 32-bit Shifter
+* the inputs are: a[31:0] - value to bit-shift
+*                 b[4:0]  - how many bits to shift
+*                 op[1:0] - type of shift: 00-left 01-right 11-arithmetic right
+*                         - op1 is 1 if arithmetic, op0 is 1 if right
+*
+* The logical right shift can be composed of 5 layers of 32 muxs. The select
+* input of the muxes for each layer corresponds to b:
+*       b4 layer shifts by 16
+*       b3 layer shifts by 8
+*       b2 layer shifts by 4
+*       b1 layer shifts by 2
+*       b0 layer shifts by 1
+*
+* An arithmetic right shift is just a logical right shift but instead of always
+* 0, what is being shifted in is the most significant bit. This can be done
+* using a single mux2 whose selector is op1.
+*
+* A logical left shift is just a logical right shift but reversed. This can be
+* done using 64 mux2. The first 32 mux will reverse the bits before shifting
+* then another 32 mux to revert back after shifting. The bit pairs to be data
+* inputs of mux2 are: 31-0, 30-1, ..., 1-30, 0-31. op0 is the selector for all
+* of the muxes.
 *******************************************************************************
 .subckt shift32 a[31:0] b[4:0] op[1:0] fshift[31:0]
-  *input code
+  *shift in 0s if logical and MSB if arithmetic
+  Xshift_in op1 0 a31 s_in mux2
+
+  *reverse input if left
+  Xreverse op0#32 a[0:31] a[31:0] input[31:0] mux2
+
+  *shifting by layer
+  Xshift16 b4#32 input[31:0] s_in#16 input[31:16] s4out[31:0] mux2
+  Xshift8 b3#32 s4out[31:0] s_in#8 s4out[31:8] s3out[31:0] mux2
+  Xshift4 b2#32 s3out[31:0] s_in#4 s3out[31:4] s2out[31:0] mux2
+  Xshift2 b1#32 s2out[31:0] s_in#2 s2out[31:2] s1out[31:0] mux2
+  Xshift1 b0#32 s1out[31:0] s_in s1out[31:1] s0out[31:0] mux2
+
+  *revert back if left
+  Xrevert op0#32 s0out[0:31] s0out[31:0] fshift[31:0] mux2
 .ends
 
 *******************************************************************************
@@ -205,3 +241,34 @@
 .subckt alu32 a[31:0] b[31:0] alufn[5:0] f[31:0]
   *input code
 .ends
+
+
+
+Wa a[31:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
++ 0x00000000 0x00000001 0x000000F0 0xF0000000
++ 0xAAAAAAAA 0x80000000 0x7FFFFFFF 0xFFFFFFFF
+
+Wb b[4:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
++ 0b00000 0b00001 0b00010 0b00100
++ 0b01000 0b00001 0b00001 0b11111
+
+Wop op[1:0] nrz(0, 5, 40ns, 0ns, 0.001ns, 0.001ns)
++ 0b00 0b00 0b01 0b11 0b00 0b11 0b01 0b00
+
+*******************************************************************************
+* DUT: Device Under Test
+*******************************************************************************
+
+Xshifter a[31:0] b[4:0] op[1:0] fshift[31:0] shift32
+
+*******************************************************************************
+* Simulation and plotting
+*******************************************************************************
+
+.tran 480ns
+.plot a[31:0]
+.plot b[4:0]
+.plot op[1:0]
+.plot fshift[31:0]
+
+.end
