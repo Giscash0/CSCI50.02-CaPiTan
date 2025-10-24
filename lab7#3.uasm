@@ -1,0 +1,69 @@
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| LAB #7.3
+| - Carlos, Danny II
+| - Piscasio, Johannes
+| - Tan, Jacob
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| Symmetric Stream Cipher with a Pre-generated Keystream
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| register meaning:
+| r0 = KEY size         assume is >= 1
+| r1 = PLAINTEXT size   assume is >= 0
+| r2 = KEY index
+| r3 = PLAINTEXT index
+| r4 = KEY offset
+| r5 = PLAINTEXT offset
+| r6 = KEY value
+| r7 = PLAINTEXT value
+| r8 = ENCRYPTED value
+| r9 = ENCRYPTED offset
+| r10 = comparison result (reusable)
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+.include beta.uasm
+
+        LD(KEY, r0)             | r0 = memory[KEY]
+        LD(PLAINTEXT, r1)       | r1 = memory[PLAINTEXT]
+
+        | if plaintxt index is pointing at last plaintxt item, we end the loop
+LOOP:   CMPEQ(r1, r3, r10)      
+        BT(r10, END)
+
+        | if key index is pointing at last key item, reset index
+        CMPEQ(r0, r2, r10)
+        BF(r10, SKIP)
+        ADD(r31, r31, r2)
+
+        | increment indices by 1
+SKIP:   ADDC(r2, 1, r2)         | r2 = r2 + 1   (note that at the start, r2=r3=0
+        ADDC(r3, 1, r3)         | r3 = r3 + 1    so both would become equal to 1)
+
+        | calculate the offsets
+        SHLC(r2, 2, r4)         | r4 = r2 * 4
+        SHLC(r3, 2, r5)         | r5 = r3 * 4
+        | load the values
+        LD(r4, KEY, r6)         | r6 = memory[r4 + KEY]
+        LD(r5, PLAINTEXT, r7)   | r7 = memory[r5 + PLAINTEXT]
+        | encrypt using bitwise XOR and append to ENCRYPTED
+        XOR(r6, r7, r8)         | r8 = r6 XOR r7
+        ST(r8, ENCRYPTED, r9)
+        ADDC(r9, 4, r9)         | r9 += 4
+        BR(LOOP)
+END:    HALT()
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+. = 0x19C
+KEY:    LONG(0)
+        LONG(42)
+        LONG(67)
+PLAINTEXT: LONG(5)
+        LONG(72)
+        LONG(69)
+        LONG(76)
+        LONG(76)
+        LONG(79)
+ENCRYPTED:
+| 0x00000062
+| 0x00000006
+| 0x00000066
+| 0x0000000F
+| 0x00000065
