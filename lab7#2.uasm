@@ -1,0 +1,74 @@
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| LAB #7.2
+| - Carlos, Danny II
+| - Piscasio, Johannes
+| - Tan, Jacob
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| In-Place Array Sorting
+| We will do a selection sort. The array will be divided into 2: sorted section
+| at the top and unsorted section at the bottom.
+|
+| The first step is to search for the maximum value found in the unsorted
+| section and place that as the least value in the sorted section. The size of
+| the unsorted section is decremented by 1. We repeat until the the size of the
+| unsorted section is 0 which indicates that all the numbers in the unsorted
+| section are in the sorted section.
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| register meaning:
+| r0 = ARRAY size/unsorted section size         assume is >= 0
+| r1 = toReplace offset
+| r2 = toReplace value
+| r3 = current offset
+| r4 = current value
+| r5 = max offset
+| r6 = max value
+| r7 = comparison result (reusable)
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+.include beta.uasm
+        LD(ARRAY, r0)           | r0 = memory[r31 + ARRAY]
+
+LOOP1:  BEQ(r0, END1)           | loop until unsorted section size is 0
+        | set the values and offsets to the end of the unsorted section
+        | The values would have the same value so instead of loading, we could
+        | just set the other registers by adding because ADD is faster than LD.
+        | The offsets also have the same value, however since shifting is
+        | faster than adding, we still shift all of them.
+        SHLC(r0, 2, r1)         | r1 = r0 * 4
+        LD(r1, ARRAY, r2)       | r2 = memory[r1 + ARRAY]
+        SHLC(r0, 2, r3)         | r3 = r0 * 4
+        ADDC(r2, 0, r4)         | r4 = r2 + 0
+        SHLC(r0, 2, r5)         | r5 = r0 * 4
+        ADDC(r2, 0, r6)         | r6 = r2 + 0
+
+        | scan the unsorted section for the max value and offset
+LOOP2:  SUBC(r3, 4, r3)         | r3 -= 4
+        | if current offset = 0, it's ponting at array size, which indicates
+        | that scanning the unsorted section is complete
+        BEQ(r3, END2)           | if r3 = 0, we end the scanning loop
+        LD(r3, ARRAY, r4)       | r4 = memory[r3 + ARRAY]
+
+        | if max value < current value, set max = current
+        CMPLT(r6, r4, r7)       | r7 = 1 if r6 < r4
+        BF(r7, LOOP2)           | if r7 = 0 branch to LOOP2
+        ADDC(r3, 0, r5)         | r5 = r3 + 0
+        ADDC(r4, 0, r6)         | r6 = r4 + 0
+        BR(LOOP2)
+
+        | place the maximum value of the unsorted section to the sorted section
+END2:   ST(r2, ARRAY, r5)       | memory[ARRAY + r5] = r2
+        ST(r6, ARRAY, r1)       | memory[ARRAY + r1] = r6
+        SUBC(r0, 1, r0)         | r0 -= 1
+        BR(LOOP1)
+END1:   HALT()
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+ARRAY:  LONG(7)
+        LONG(5)
+        LONG(7)
+        LONG(8)
+        LONG(6)
+        LONG(4)
+        LONG(9)
+        LONG(3)
