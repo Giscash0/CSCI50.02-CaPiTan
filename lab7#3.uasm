@@ -24,10 +24,6 @@
 | r11 = temporary storage of KEY+4 in case KEY size is 0
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 .include beta.uasm
-
-        ST(r31, 512)
-        LD(508, r20)
-
         LD(KEY, r0)             | r0 = memory[KEY]
         LD(PLAINTEXT, r1)       | r1 = memory[PLAINTEXT]
 
