@@ -5,6 +5,9 @@
 | - Tan, Jacob
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 | Symmetric Stream Cipher with a Pre-generated Keystream
+| The program encrypts the plaintext by sequentially using a bitwise XOR for
+| each element of key and plaintext. If ever the keys are exhausted, we wrap
+| around.
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 | register meaning:
 | r0 = KEY size         assume is >= 1
@@ -31,7 +34,7 @@ LOOP:   CMPEQ(r1, r3, r10)
         | if key index is pointing at last key item, reset index
         CMPEQ(r0, r2, r10)
         BF(r10, SKIP)
-        ADD(r31, r31, r2)
+        ADD(r31, r31, r2)       | r2 = 0
 
         | increment indices by 1
 SKIP:   ADDC(r2, 1, r2)         | r2 = r2 + 1   (note that at the start, r2=r3=0
