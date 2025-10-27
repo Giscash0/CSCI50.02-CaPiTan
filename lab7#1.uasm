@@ -1,0 +1,51 @@
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| LAB #7.1
+| - Carlos, Danny II
+| - Piscasio, Johannes
+| - Tan, Jacob
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| Fibonacci Sequence Generation
+| This program generates and stores the first n Fibonacci numbers in memory,
+| starting from F0 = 0 and F1 = 1.
+|
+| The number of terms to generate n is loaded from the input label. The sequence
+| is calculated iteratively, with each new term being the sum of the two preceding
+| terms. The terms are stored sequentially starting at the output label.
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+| register meaning:
+| r0 = n, counter/number of terms remaining
+| r1 = comparison result (reusable)
+| r2 = Fib(i), the current Fibonacci number, initially 0
+| r3 = Fib(i+1), the next Fibonacci number, initially 1
+| r4 = Fib(i+2), temporary storage for the new Fibonacci number
+| r9 = output address, pointer to the current storage location
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+.include beta.uasm
+
+LD(r31, INPUT, r0)  | r0 = n
+| We assume that r2 already contains 0, which is also F0.
+ADDC(r31, 1, r3)    | r3 = 1 (F1)
+LD(r31, OUTPUT, r9) | r9 = address of output array
+
+LOOP:
+CMPLEC(r0, 0, r1) | r1 = 1 if r0 <= 0
+BT(r1, END)       | Branch to END if all terms are generated (n=0)
+SUBC(r0, 1, r0)   | Decrement n (one term processed)
+
+ST(r2, 0, r9)     | Store the current term (F[i]) at output[i]
+ADDC(r9, 4, r9)   | Increment output pointer to the next word
+
+ADD(r2, r3, r4)   | r4 = r2 + r3, calculate the next term F[i+2]
+MOVE(r3, r2)      | r2 = r3, move F[i+1] to be the new F[i]
+MOVE(r4, r3)      | r3 = r4, Move F[i+2] to be the new F[i+1]
+
+BR(LOOP)    | Loop back
+
+END:
+HALT()
+
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+INPUT: LONG(7)   
+OUTPUT:
