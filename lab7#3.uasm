@@ -10,7 +10,7 @@
 | around.
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 | register meaning:
-| r0 = KEY size         assume is >= 1
+| r0 = KEY size         assume is >= 0
 | r1 = PLAINTEXT size   assume is >= 0
 | r2 = KEY index
 | r3 = PLAINTEXT index
@@ -21,11 +21,22 @@
 | r8 = ENCRYPTED value
 | r9 = ENCRYPTED offset
 | r10 = comparison result (reusable)
+| r11 = temporary storage of KEY+4 in case KEY size is 0
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 .include beta.uasm
 
+        ST(r31, 512)
+        LD(508, r20)
+
         LD(KEY, r0)             | r0 = memory[KEY]
         LD(PLAINTEXT, r1)       | r1 = memory[PLAINTEXT]
+
+        | if key size is 0, encrypted will be the same as the plaintext
+        LD(KEY+4, r11)          | load the memory after KEY
+        BNE(r0, LOOP)
+        ST(r31, KEY+4)          | temporarily store 0 at that memory
+        ADDC(r31, 1, r0)        | set key size to 1 so that the 0 key will be read
+        | 0 is stored because: a XOR 0 = a
 
         | if plaintxt index is pointing at last plaintxt item, we end the loop
 LOOP:   CMPEQ(r1, r3, r10)      
@@ -51,8 +62,8 @@ SKIP:   ADDC(r2, 1, r2)         | r2 = r2 + 1   (note that at the start, r2=r3=0
         ST(r8, ENCRYPTED, r9)
         ADDC(r9, 4, r9)         | r9 += 4
         BR(LOOP)
-END:    HALT()
-
+END:    ST(r11, KEY+4)          | bring back the correct value stored in KEY+4
+        HALT()
 |||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 KEY:    LONG(2)
         LONG(42)
