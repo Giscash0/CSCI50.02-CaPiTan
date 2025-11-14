@@ -222,3 +222,64 @@ Xjdisplayb wr_werfs[2:0]    wr werf werf_          join
 .plot d(mema[8:0])
 .plot sd(memrd[31:0])
 .plot sd(memwd[31:0])
+
+*******************************************************************************
+* a. What is the true purpose of the additional Z input (on top of the
+*    instruction opcode inputs) in the Xcontrol block?
+*
+* The Z input is essential for implementing conditional branch 
+* instructions like BEQ (Branch if Equal) and BNE (Branch if Not
+* Equal).
+*
+* The control logic's inputs are the instruction's opcode and this
+* Z signal. The Z signal becomes 'true' (1) only when the output of
+* the 'ra' register (rd1_[31:0]) is zero.
+*
+* The control logic uses this Z input to decide what value to output
+* for the PCSEL (Program Counter Select) signal.
+*   * For a BEQ instruction: If Z=1 (meaning <ra> is 0), the control
+*     logic sets PCSEL to take the branch (PCSEL = 01). If Z=0, it sets
+*     PCSEL to advance to <PC>+4 (PCSEL = 00).
+*   * For a BNE instruction: The logic is reversed. If Z=0 (meaning
+*     <ra> is nnot 0), PCSEL is set to take the branch (PCSEL = 01).
+*
+* Without the Z input, the control logic would have no way to know
+* if the branch condition has been met.
+*
+*
+* b. What is the true purpose of setting the invalid instructions'
+*    control logic output to the constant 0b11000000000000?
+*
+* The lab specifies that all invalid opcodes should be treated
+* as a HALT instruction. The constant 0b11000000000000 is the
+* 14-bit control signal for HALT.
+*
+* We can verify this by looking at the signal order and the
+* HALT instruction's requirements:
+*
+*   Signal:     [ PCSEL | RA2SEL | BSEL | WDSEL | ALUFN | Wr | WERF ]
+*   Bit Index:  [ 13:12 | 11     | 10   | 9:8   | 7:2   | 1  | 0    ]
+*   HALT Value: [ 11    | X      | X    | XX    | XXXXXX| 0  | 0    ]
+*
+* Setting all "don't care" (X) bits to 0 gives:
+*
+*   0b 11 0 0 00 000000 0 0  =  0b11000000000000
+*
+* This configuration does two things to stop the processor safely:
+* 1. PCSEL = 11: This selects the current <PC> as the address for
+*    the next instruction, causing the processor to get stuck in 
+*    an infinite loop at the HALT instruction, effectively stopping
+*    execution.
+* 2. Wr = 0 and WERF = 0: This disables writing to both the Data
+*    Memory and the Register File.
+*
+* The purpose is to ensure that if the processor ever fetches an
+* undefined opcode, it will safely stop instead of performing
+* unpredictable and potentially disastrous operations.
+*
+*
+* c. Does your Lab 7 program (that you yourself provided) represent a
+*    good number of opcodes that your control logic supports? What's
+*    the functional cpverage? (i.e., which opcodes did you implement
+*    in your control logic table, and which ones are actually exercised
+*    by your Lab 7 program?)
