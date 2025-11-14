@@ -82,7 +82,18 @@ Xregisters  vdd  0    0      ra1_[4:0]  rd1_[31:0]
 *       the werf_ signal is forced OFF; otherwise, it should pass through the
 *       original werf signal.
 *******************************************************************************
-.connect werf werf_
+* We connect wa[4:0] to a 5-input AND gate:
+*    x = ABCDE
+*      = !!((AB)(CD)E)
+*      = !(!(AB)+!(CD)+!E)
+*
+* This will be used as the signal for a 2-way multiplexers that connects
+* werf_ either to werf when x=0 or 0 when x=1.
+*******************************************************************************
+Xnandwa wa[4:1] wa_[2:1] nand2
+Xinvwa wa0 wa_0 inverter
+Xnorwa wa_[2:0] isR31 nor3
+Xmuxwa isR31 werf 0 werf_ mux2
 
 *******************************************************************************
 * Xcontrol is a read-only memory (ROM) that defines what to feed into the
