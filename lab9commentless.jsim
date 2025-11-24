@@ -1,0 +1,188 @@
+.include "8clocks.jsim"     
+.include "nominal.jsim"     
+.include "stdcell.jsim"     
+
+.subckt join S T
+  .connect S T
+.ends
+
+Xmemory  vdd  0    0   pc[8:2]    inst[31:0]
++        vdd  0    0   mema[8:2]  memrd[31:0]
++        0    clk  wr  mema[8:2]  memwd[31:0]
++ $memory width=32 nlocations=128 file="lab7.bin"
+
+Xregisters  vdd  0    0      ra1_[4:0]  rd1_[31:0]
++           vdd  0    0      ra2_[4:0]  rd2_[31:0]
++           0    clk  werf_  wa[4:0]    wd[31:0]
++ $memory width=32 nlocations=32 contents=(
++   0 0 0 0 0 0 0 0
++   0 0 0 0 0 0 0 0
++   0 0 0 0 0 0 0 0
++   0 0 0 0 0 0 0 0
++ )
+
+Xand1      wa[4:1]  is_r31a   and4      	
+Xand2      wa0      is_r31a   is_r31    and2    
+Xnotr31    is_r31   not_r31   inverter  	
+Xwerf_calc werf     not_r31   werf_out  and2    
+
+Xcontrol  vdd  0  0  z opcode[5:0]  control[13:0]
++ $memory width=14 nlocations=128 contents=(
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b00011000000001 0b00110000000010 0b11000000000000 0b10000000000001 0b11000000000000 0b00000000000001 0b01000000000001 0b11000000000000
++   0b00000100000001 0b00000100000101 0b11000000000000 0b11000000000000 0b00000111001301 0b00000111010101 0b00000111011101 0b11000000000000
++   0b00000101100001 0b00000101111001 0b00000101011001 0b11000000000000 0b00000110000001 0b00000110000101 0b00000110001101 0b11000000000000
++   0b00010100000001 0b00010100000101 0b11000000000000 0b11000000000000 0b00010111001101 0b00010111010101 0b00010111011101 0b11000000000000
++   0b00010101100001 0b00010101111001 0b00010101011001 0b11000000000000 0b00010110000001 0b00010110000101 0b00010110001101 0b11000000000000
++
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000 0b11000000000000
++   0b00011000000001 0b00110000000010 0b11000000000000 0b10000000000001 0b11000000000000 0b01000000000001 0b00000000000001 0b11000000000000
++   0b00000100000001 0b00000100000101 0b11000000000000 0b11000000000000 0b00000111001101 0b00000111010101 0b00000111011101 0b11000000000000
++   0b00000101100001 0b00000101111001 0b00000101011001 0b11000000000000 0b00000110000001 0b00000110000101 0b00000110001101 0b11000000000000
++   0b00010100000001 0b00010100000101 0b11000000000000 0b11000000000000 0b00010111001101 0b00010111010101 0b00010111011101 0b11000000000000
++   0b00010101100001 0b00010101111001 0b00010101011001 0b11000000000000 0b00010110000001 0b00010110000101 0b00010110001101 0b11000000000000
++ )
+
+.subckt fa a b c_in sum c_out
+  Xfa_1 a b    c_1    nand2
+  Xfa_2 a c_in c_2    nand2
+  Xfa_3 b c_in c_3    nand2
+  Xfa_4 c_1 c_2 c_3 c_out nand3
+
+  Xfa_5 a   b    s_1 xor2
+  Xfa_6 s_1 c_in sum xor2
+.ends
+
+.subckt add32 a[31:0] b[31:0] cin0 sum[31:0] cout[31:30]
+  Xadd a[0:31] b[0:31] cin0 cout[0:30] sum[0:31] cout[0:31] fa
+.ends
+
+.subckt as32 a[31:0] b[31:0] op0 fas[31:0] n v z
+  Xbres b[31:0] op0#32 bresult[31:0] xor2            
+
+  Xas   a[31:0] bresult[31:0] op0 fas[31:0] cout[31:30] add32
+
+  .connect n fas31                                   
+  Xoverflow cout31 cout30 v xor2                     
+
+  Xbranch1 fas[0:7]  fas[8:15] fas[16:23] fas[24:31] branch1_[0:7] nor4
+  Xbranch2 branch1_[0:1] branch1_[2:3] branch1_[4:5] 
+  +       branch1_[6:7] branch2_[0:1]                nand4 
+  Xbranch3 branch2_0 branch2_1 z                     nor2             
+.ends
+
+.subckt cmp32 n v z op[2:1] fcmp[31:0]
+  Xop1_mux op1 0    z           net_op1    mux2 
+  Xop2_xor n   v    net_op2_x   xor2              
+  Xop2_mux op2 0    net_op2_x   net_op2    mux2  
+  Xout     net_op1 net_op2      fcmp0      or2   
+  .connect fcmp[31:1] 0#31                        
+.ends
+
+.subckt bool32 a[31:0] b[31:0] op[3:0] fbool[31:0]
+  Xma a[0:31] b[0:31] op0#32 op1#32 op2#32 op3#32 fbool[0:31] mux4
+.ends
+
+
+.subckt shift32 a[31:0] b[4:0] op[1:0] fshift[31:0] 
+  Xreverser_ a[0:31]         reverse[31:0]     join
+  Xin        op0#32          reverse[31:0] a[31:0] in[31:0] mux2
+  Xfeed      op1             0           a31       feed      mux2 
+
+  Xright4_   b4#32           in[31:0]   feed#16 in[31:16] stage4[31:0] mux2
+  Xright3_   b3#32           stage4[31:0] feed#8  stage4[31:8]  stage3[31:0] mux2
+  Xright2_   b2#32           stage3[31:0] feed#4  stage3[31:4]  stage2[31:0] mux2
+  Xright1_   b1#32           stage2[31:0] feed#2  stage2[31:2]  stage1[31:0] mux2
+  Xright0_   b0#32           stage1[31:0] feed#1  stage1[31:1] ftemp[31:0]  mux2
+
+  Xout       op0#32          ftemp[0:31] ftemp[31:0] fshift[31:0] mux2
+.ends
+
+.subckt alu32 a[31:0] b[31:0] alufn[5:0] f[31:0] 
+  Xas32    a[31:0] b[31:0] alufn[0]   fas[31:0] n v z        as32
+  Xbool32  a[31:0] b[31:0] alufn[3:0] fbool[31:0]            bool32
+  Xshift32 a[31:0] b[4:0]  alufn[1:0] fshift[31:0]           shift32
+  Xcmp32   n       v       z       alufn[2:1] fcmp[31:0]     cmp32
+  Xoutmux  alufn[5]#32 alufn[4]#32 fas[31:0]  fshift[31:0]
+  +        fbool[31:0] fcmp[31:0]  f[31:0]                   mux4
+.ends
+
+Xjcontrola control[13:12] pcsel[1:0]   join
+Xjcontrolb control11      ra2sel       join
+Xjcontrolc control10      bsel         join
+Xjcontrold control[9:8]   wdsel[1:0]   join
+Xjcontrole control[7:2]   alufn[5:0]   join
+Xjcontrolf control1       wr_temp      join
+Xjcontrolg control0       werf         join
+
+Xjinsta inst[31:26] opcode[5:0] join
+Xjinstb inst[25:21] rc[4:0]     join
+Xjinstc inst[20:16] ra[4:0]     join
+Xjinstd inst[15:11] rb[4:0]     join
+Xjinste inst[15:0]  c[15:0]     join
+
+Xclk   clk         clk2       join
+Xra1_  ra[4:0]     ra1_[4:0]  join
+Xwa    wa[4:0]     rc[4:0]    join
+Xmema  mema[8:0]   f[8:0]     join
+Xmemwd memwd[31:0] rd2_[31:0] join
+
+Xjdisplaya ra2_b_wdsel[3:0] ra2sel bsel wdsel[1:0] join
+Xjdisplayb wr_werfs[2:0]    wr werf werf_          join
+
+Xpc00    0#2           clk#2    pc[0:1]    dreg
+Xpc8to2  pc_feed[31:2] clk#30   pc[31:2]   dreg
+Xpcplus4 pc[31:0] 0#29 vdd 0#2 0 pcplus4[31:0] pcout[31:30] add32
+
+Xcbranchsext1  c15#16        c_sext[31:16] join
+Xcbranchsext2  c[15:0]       c_sext[15:0]  join
+Xcbranchshift1 c_sext[29:0]  c_shift[31:2] join
+Xcbranchshift2 c_shift[1:0]  0#2           join
+Xcbranchadd    c_shift[31:0] pcplus4[31:0] 0 bt[31:0] btout[31:30] add32
+
+Xjump rd1_[31:0] jt[31:0] join
+
+Xz1 rd1_[0:7]  rd1_[8:15] rd1_[16:23] rd1_[24:31] rdbranch1_[0:7]  nor4
+Xz2 rdbranch1_[0:1] rdbranch1_[2:3] rdbranch1_[4:5] rdbranch1_[6:7]
++   rdbranch2_[0:1]                                            nand4 
+Xz3 rdbranch2_0 rdbranch2_1 z                                  nor2
+
+Xpcselmux  pcsel0#32 pcsel1#32  pcplus4[31:0]  bt[31:0]
++          jt[31:0]  pc[31:0]   next_pc[31:0]  mux4
+
+Xra2selmux ra2sel#5  rb[4:0]    rc[4:0]        ra2_[4:0] mux2
+
+Xbselmux   bsel#32   rd2_[31:0] c15#16 c[15:0] b[31:0] mux2
+
+Xwdselmux  wdsel0#32 wdsel1#32  pcplus4[31:0]  f[31:0]
++          memrd[31:0] 0#32 wd[31:0] mux4
+
+Wreset reset nrz(0,5,10ns,.1ns,.1ns,0.1ns) 1 0 
+
+XresetPC   reset#32 next_pc[31:0] 0#32     pc_feed[31:0] mux2
+XresetWerf reset    werf_out      0        werf_         mux2
+XresetWr   reset    wr_temp       0        wr            mux2
+
+Xalu rd1_[31:0] b[31:0] alufn[5:0] f[31:0] alu32
+
+.tran 1430ns
+.plot pc[8:0]
+.plot betaop(opcode[5:0])
+.plot d(ra[4:0])
+.plot d(rb[4:0])
+.plot d(rc[4:0])
+.plot sd(c[15:0])
+.plot b(pcsel[1:0])
+.plot b(ra2_b_wdsel[3:0])
+.plot b(alufn[5:0])
+.plot b(wr_werfs[2:0])
+.plot sd(rd1_[31:0])
+.plot sd(rd2_[31:0])
+.plot sd(wd[31:0])
+.plot d(mema[8:0])
+.plot sd(memrd[31:0])
+.plot sd(memwd[31:0])
