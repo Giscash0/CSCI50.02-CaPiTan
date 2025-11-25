@@ -92,110 +92,254 @@ Xcontrol  vdd  0  0  z opcode[5:0]  control[13:0]
 + )
 
 *******************************************************************************
-* 1-bit full adder (fa): adds a + b + c_in => sum, c_out.
+* Full Adder
+*
+* Truth Table:
+* a b c_in sum c_out
+* 0 0  0    0    0
+* 0 0  1    1    0
+* 0 1  0    1    0
+* 0 1  1    0    1
+* 1 0  0    1    0
+* 1 0  1    0    1
+* 1 1  0    0    1
+* 1 1  1    1    1
+*
+* sum = !a!bc_in + !ab!c_in + a!b!c_in + abc_in   from the truth table
+*     = c_in(!a!b + ab) + !c_in(!ab + a!b)        by distributive law
+*     = c_in!(aâb) + !c_in(aâb)                 substituting to XOR
+*     = a â b â c_in                            substituting to XOR
+* c_out = !abc_in + a!bc_in + ab!c_in + abc_in    from the truth table
+*       = c_in(!ab + a!b) + ab(!c_in + c_in)      by distributive law
+*       = c_in(!ab + a!b) + ab(1)                 by complement law
+*       = c_in(!ab + a!b) + ab                    by identity law
+*       = ab + c_in(aâb)                         turn to xor because we already
+*                                                 know aâb from the sum
+*       = !(!(ab + c_in(aâb)))                   by double negation law
+*       = !(!(ab)!(c_in(aâb)))                   by De Morgan's theorem
 *******************************************************************************
 .subckt fa a b c_in sum c_out
-  Xfa_1 a b    c_1    nand2
-  Xfa_2 a c_in c_2    nand2
-  Xfa_3 b c_in c_3    nand2
-  Xfa_4 c_1 c_2 c_3 c_out nand3
-
-  Xfa_5 a   b    s_1 xor2
-  Xfa_6 s_1 c_in sum xor2
+  Xsum1 a b out1 xor2
+	Xsum2 out1 c_in sum xor2
+	Xcarry1 a b out2 nand2
+	Xcarry2 c_in out1 out3 nand2
+	Xcarry3 out2 out3 c_out nand2
 .ends
 
 *******************************************************************************
-* 32-bit ripple-carry adder (add32) built from full adders.
-* Inputs:  a, b, cin0
-* Outputs: sum[31:0], cout[31:30] (exposes the final two carry bits)
+* 32-bit Full Adder
+* We instantiate 32 full adder and the carry ripples from the less significant
+* bit to the more significant bit. The ith full adder adds a_i and b_i with the
+* carry input being the carry output of the previous full adder, which is
+* c_out_i-1. Since the 0th fa doesn't have a previous fa, its carry input is
+* cin0. Thus, each bit instantiation goes like:
+*      Xbit#0 a31 b31 cout30 sum31 cout31 fa
+*      Xbit#1 a30 b30 cout29 sum30 cout30 fa
+*      ...
+*      Xbit#30 a1 b1 cout0 sum1 cout1 fa
+*      Xbit#31 a0 b0 cin0 sum0 cout0 fa
+*
+* However with the power of jsim, we can instantiate by:
+*      Xbits 32_a 32_b 31_prev_cout_then_least_bit's_cin 32_sum 32_carry_out fa
 *******************************************************************************
 .subckt add32 a[31:0] b[31:0] cin0 sum[31:0] cout[31:30]
-  Xadd a[0:31] b[0:31] cin0 cout[0:30] sum[0:31] cout[0:31] fa
+  Xbits a[31:0] b[31:0] cout[30:0] cin0 sum[31:0] cout[31:0] fa
 .ends
 
 *******************************************************************************
-* as32: 32-bit add/subtract with flags.
-* op0 = 0 => addition; op0 = 1 => subtraction via b XOR 0xFFFFFFFF and +1
-* Outputs:
-*   fas[31:0] : arithmetic result
-*   n         : negative flag (copy of MSB of fas)
-*   v         : overflow flag (xor of last two carries)
-*   z         : zero flag (1 when fas == 0)
+* 32-bit Adder/Subtractor
+* For inputs, we have a 32-bit A and B as well as the op0. The input op0 is 0
+* for addition and 1 for subtraction. We know that A - B = A + ~B + 1. We also
+* know that the constructor for the 32-bit Full Adder inputs a carry in bit for
+* the least significant bit. Thus, we can connect op0 to cin0 to handle the +1.
+*
+* For the ~B, we can just use a 2-input multiplexer where d0 = B, d1 = ~B, and
+* s = op0. This is so that when op0 = 0, indicating addition, what is being added
+* is just A + B(d0) + 0(op0) or A + B. Otherwise, when op0 = 1, indicating
+* subtraction, what is being added is A + ~B(d1) + 1(op0) or A - B.
+*
+* We have output n which is 0 if fas is positive and 1 if negative. We only need
+* to check fas31. The most significant bit of signed bits is 0 when it is positive
+* and 1 when it is negative. Therefore, n = fas31.
+* 
+* Output v is 1 when the operation result in a signed overflow or the value
+* "wrapped around". We notice that when the carry out of the 2 most significant
+* bits are not equal, there is an overflow. If they are equal, there is no
+* overflow. Putting that in a truth table, it is an exclusive or. Therefore,
+* v = cout31 â cout30
+*
+* Output z is 1 if all 32 bits fas[31:0] are 0, otherwise z is 0.
+* Suppose we want to make 2 bits return 1 if both bits are 0:
+*      X = !A!B
+*      X = !(A+B)
+* 4 bits would be X(A,B) and X(C,D):
+*      X = !(A+B)!(C+D)
+*      X = !!(!(A+B)!(C+D))
+* 8 bits would be X(A,B,C,D) and X(E,F,G,H):
+*      X = !!(!(A+B)!(C+D)) !!(!(E+F)!(G+H))
+*      X = !(!(!(A+B)!(C+D))+!(!(E+F)!(G+H)))
+* 16 bits would be X(A,B,C,D,E,F,G,H) and X(I,J,K,L,M,N,O,P)
+*      X = !(!(!(A+B)!(C+D))+!(!(E+F)!(G+H))) !(!(!(I+J)!(K+L))+!(!(M+N)!(O+P)))
+*      X = !!(!(!(!(A+B)!(C+D))+!(!(E+F)!(G+H))) !(!(!(I+J)!(K+L))+!(!(M+N)!(O+P))))
+* 32 bits would be X(0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15) and X(16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31)
+*      X = !!(!(!(!(0+1)!(2+3))+!(!(4+5)!(6+7))) !(!(!(8+9)!(10+11))+!(!(12+13)!(14+15))))
+*          !!(!(!(!(16+17)!(18+19))+!(!(20+21)!(22+23))) !(!(!(24+25)!(26+27))+!(!(28+29)!(30+31))))
+*      X = !(
+*          !(!(!(!(0+1)!(2+3))+!(!(4+5)!(6+7))) !(!(!(8+9)!(10+11))+!(!(12+13)!(14+15))))
+*          +
+*          !(!(!(!(16+17)!(18+19))+!(!(20+21)!(22+23))) !(!(!(24+25)!(26+27))+!(!(28+29)!(30+31))))
+*          )
+* This makes 16 NOR gates at the innermost, then 8 NAND gates, then 4 NOR gates,
+* then 2 NAND gates, and finally a NOR gates. We arived to our answer using
+* multiple De Morgan's and double negation. We substitute X to z and the numbers
+* to fas[31:0].
 *******************************************************************************
 .subckt as32 a[31:0] b[31:0] op0 fas[31:0] n v z
-  Xbres b[31:0] op0#32 bresult[31:0] xor2            * conditionally invert b
+  * nb# = ~b#
+  XinvertedB b[31:0] nb[31:0] inverter
+  * connect op0 to all mux
+  * if op0 = 0, newb# = b#
+  * else if op0 = 1, newb# = nb#
+  Xbmux op0#32 b[31:0] nb[31:0] newb[31:0] mux2
+  * we add a[31:0] and newb[31:0] using the 32-bit Adder with op0 as cin0
+  Xas a[31:0] newb[31:0] op0 fas[31:0] cout[31:30] add32
+  * since n = fas31, we connect them
+  .connect fas31 n
+  * we get XOR of cout31 and cout30 to get v
+  Xoverflow cout[31:30] v xor2
 
-  Xas   a[31:0] bresult[31:0] op0 fas[31:0] cout[31:30] add32
-
-  .connect n fas31                                   * n = MSB of result
-  Xoverflow cout31 cout30 v xor2                     * overflow = c31 XOR c30
-
-  Xbranch1 fas[0:7]  fas[8:15] fas[16:23] fas[24:31] branch1_[0:7] nor4
-  Xbranch2 branch1_[0:1] branch1_[2:3] branch1_[4:5] 
-  +       branch1_[6:7] branch2_[0:1]                nand4 
-  Xbranch3 branch2_0 branch2_1 z                     nor2
+  * in solving for z we start with the first 16 NORs
+  Xza fas[31:0] fza[15:0] nor2
+  * then 8 NANDs
+  Xzb fza[15:0] fzb[7:0] nand2
+  * then 4 NORs
+  Xzc fzb[7:0] fzc[3:0] nor2
+  * then 2 NANDs
+  Xzd fzc[3:0] fzd[1:0] nand2
+  * finally 1 NOR
+  Xze fzd[1:0] z nor2
 .ends
 
 *******************************************************************************
-* cmp32: builds comparison result (e.g., CMPEQ, CMPLT, CMPLE) from flags.
-* Inputs: n, v, z, op[2:1] (encoded comparison type)
-* Output: fcmp[31:0] where bit 0 holds the comparison result, others 0.
+* 32-bit Comparator
+* We compare a[31:0] and b[31:0]. We have n, v, z inputs coming from the output
+* of as32. op[2:1] determines the comparison type. fcmp0 is the boolean that
+* affirms if the comparison is true(1) or false(0).
+* We don't care when we are adding and when both op1 & op2 are 0.
+*
+* If op1=1 then fcmp0=1 iff A=B.
+* We only care about subtraction. When subtracting using as32 and A = B,
+* A - B = 0. This makes z = 1. Thus, if op1=1 then fcmp0=1 iff z=1. Therefore:
+*      fcmp0 = (op1)(z)
+*
+* If op2=1 then fcmp0=1 iff A<B.
+* We only care about subtraction. Note the following 4-bit subtraction and the
+* resulting n and v values and wether A is less than B:
+*      0101 - 0011: n=0 v=0 isless=0
+*      1001 - 0011: n=0 v=1 isless=1
+*      0011 - 0101: n=1 v=0 isless=1
+*      0111 - 1101: n=1 v=1 isless=0
+* We notice that isless = nâv. Therefore:
+*      fcmp0 = (op2)(nâv)
+*
+* If both op1 and op2 are 1, then fcmp0=1 iff A<=B. This is read as less than
+* OR equal to. Therefore we add the first 2:
+*      fcmp0 = (op1)(z) + (op2)(nâv)
 *******************************************************************************
 .subckt cmp32 n v z op[2:1] fcmp[31:0]
-  Xop1_mux op1 0    z           net_op1    mux2     * select z or 0
-  Xop2_xor n   v    net_op2_x   xor2                * n XOR v
-  Xop2_mux op2 0    net_op2_x   net_op2    mux2     * select (n^v) or 0
-  Xout     net_op1 net_op2      fcmp0      or2      * combine into result bit
-  .connect fcmp[31:1] 0#31                            * upper bits forced to 0
+  * we don't care about fcmp[31:1] so we connect it to ground
+  .connect 0 fcmp[31:1]
+
+  * for op1=1
+  Xandop1 op1 z isequal and2
+  
+  * for op2=1
+  Xxorop2 n v exclusive xor2
+  Xandop2 op2 exclusive isless and2
+
+  * for op1=op2=1
+  Xboth isequal isless fcmp0 or2
 .ends
 
 *******************************************************************************
-* bool32: 32-bit bitwise Boolean ops (AND, OR, XOR, etc.)
-* Controlled by op[3:0], implemented as a wide mux over 32-bit inputs.
+* 32-bit Bitwise Boolean Circuit
+* 4-Way Multiplexers are essentially programmable boolean gates. Using the
+* A-bit and B-bit as the selectors, the data inputs can just be the 1s and 0s
+* as if it was a truth table.
+*
+* The subcircuit's op inputs already determines the data inputs so the only
+* thing we need to instantiate are the 32 4-way multiplexers for each bit.
+*
+* op[3:0] = 1000 (AND)
+*         = 1110 (OR)
+*         = 0110 (XOR)
 *******************************************************************************
 .subckt bool32 a[31:0] b[31:0] op[3:0] fbool[31:0]
-  Xma a[0:31] b[0:31] op0#32 op1#32 op2#32 op3#32 fbool[0:31] mux4
+  Xmuxes a[31:0] b[31:0] op0#32 op1#32 op2#32 op3#32 fbool[31:0] mux4
 .ends
 
 *******************************************************************************
-* shift32: 32-bit barrel shifter.
-* Inputs:
-*   a[31:0] : value to shift
-*   b[4:0]  : shift amount
-*   op[1:0] : shift type (logical/arithmetic, left/right)
-* Output:
-*   fshift[31:0] : shifted result
+* 32-bit Shifter
+* the inputs are: a[31:0] - value to bit-shift
+*                 b[4:0]  - how many bits to shift
+*                 op[1:0] - type of shift: 00-left 01-right 11-arithmetic right
+*                         - op1 is 1 if arithmetic, op0 is 1 if right
+*
+* The logical right shift can be composed of 5 layers of 32 muxs. The select
+* input of the muxes for each layer corresponds to b:
+*       b4 layer shifts by 16
+*       b3 layer shifts by 8
+*       b2 layer shifts by 4
+*       b1 layer shifts by 2
+*       b0 layer shifts by 1
+*
+* An arithmetic right shift is just a logical right shift but instead of always
+* 0, what is being shifted in is the most significant bit. This can be done
+* using a single mux2 whose selector is op1.
+*
+* A logical left shift is just a logical right shift but reversed. This can be
+* done using 64 mux2. The first 32 mux will reverse the bits before shifting
+* then another 32 mux to revert back after shifting. The bit pairs to be data
+* inputs of mux2 are: 31-0, 30-1, ..., 1-30, 0-31. op0 is the selector for all
+* of the muxes.
 *******************************************************************************
-.subckt shift32 a[31:0] b[4:0] op[1:0] fshift[31:0] 
-  Xreverser_ a[0:31]         reverse[31:0]     join
-  Xin        op0#32          reverse[31:0] a[31:0] in[31:0] mux2
-  Xfeed      op1             0           a31       feed      mux2 
+.subckt shift32 a[31:0] b[4:0] op[1:0] fshift[31:0]
+  *shift in 0s if logical and MSB if arithmetic
+  Xshift_in op1 0 a31 s_in mux2
 
-  Xright4_   b4#32           in[31:0]   feed#16 in[31:16] stage4[31:0] mux2
-  Xright3_   b3#32           stage4[31:0] feed#8  stage4[31:8]  stage3[31:0] mux2
-  Xright2_   b2#32           stage3[31:0] feed#4  stage3[31:4]  stage2[31:0] mux2
-  Xright1_   b1#32           stage2[31:0] feed#2  stage2[31:2]  stage1[31:0] mux2
-  Xright0_   b0#32           stage1[31:0] feed#1  stage1[31:1] ftemp[31:0]  mux2
+  *reverse input if left
+  Xreverse op0#32 a[0:31] a[31:0] input[31:0] mux2
 
-  Xout       op0#32          ftemp[0:31] ftemp[31:0] fshift[31:0] mux2
+  *shifting by layer
+  Xshift16 b4#32 input[31:0] s_in#16 input[31:16] s4out[31:0] mux2
+  Xshift8 b3#32 s4out[31:0] s_in#8 s4out[31:8] s3out[31:0] mux2
+  Xshift4 b2#32 s3out[31:0] s_in#4 s3out[31:4] s2out[31:0] mux2
+  Xshift2 b1#32 s2out[31:0] s_in#2 s2out[31:2] s1out[31:0] mux2
+  Xshift1 b0#32 s1out[31:0] s_in s1out[31:1] s0out[31:0] mux2
+
+  *revert back if left
+  Xrevert op0#32 s0out[0:31] s0out[31:0] fshift[31:0] mux2
 .ends
 
 *******************************************************************************
-* alu32: Top-level 32-bit ALU.
-* Uses:
-*   - as32   for add/sub + flags (n, v, z)
-*   - bool32 for bitwise ops
-*   - shift32 for shifts
-*   - cmp32  for comparisons
-* The alufn[5:0] selects which of these functional units drives the final f.
+* 32-bit Arithmetic Logic Unit
+* We instantiate all 4 functions and input a[31:0] b[31:0] alufn[3:0] to all the
+* functions while noting that cmp32 relies on as32 so their nvz must be connected.
+*
+* alufn[5:4] determines the type of function to do:
+*       00 - adder/subtractor (as32)
+*       01 - boolean (bool32)
+*       10 - shifter (shift32)
+*       11 - comparator (cmp32)
+* We use 32 4-way multiplexers with alufn[5:4] as selectors and the outputs of
+* the functions as the data inputs.
 *******************************************************************************
-.subckt alu32 a[31:0] b[31:0] alufn[5:0] f[31:0] 
-  Xas32    a[31:0] b[31:0] alufn[0]   fas[31:0] n v z        as32
-  Xbool32  a[31:0] b[31:0] alufn[3:0] fbool[31:0]            bool32
-  Xshift32 a[31:0] b[4:0]  alufn[1:0] fshift[31:0]           shift32
-  Xcmp32   n       v       z       alufn[2:1] fcmp[31:0]     cmp32
-  Xoutmux  alufn[5]#32 alufn[4]#32 fas[31:0]  fshift[31:0]
-  +        fbool[31:0] fcmp[31:0]  f[31:0]                   mux4
+.subckt alu32 a[31:0] b[31:0] alufn[5:0] f[31:0]
+  Xas a[31:0] b[31:0] alufn0 fas[31:0] n v z as32
+  Xbool a[31:0] b[31:0] alufn[3:0] fbool[31:0] bool32
+  Xshift a[31:0] b[4:0] alufn[1:0] fshift[31:0] shift32
+  Xcmp n v z alufn[2:1] fcmp[31:0] cmp32
+  Xtype alufn4#32 alufn5#32 fas[31:0] fbool[31:0] fshift[31:0] fcmp[31:0] f[31:0] mux4
 .ends
 
 *******************************************************************************
@@ -278,10 +422,9 @@ Xjump rd1_[31:0] jt[31:0] join
 *   - rdbranch2_: second-stage NAND combining partial results
 *   - final NOR gives z.
 *******************************************************************************
-Xz1 rd1_[0:7]  rd1_[8:15] rd1_[16:23] rd1_[24:31] rdbranch1_[0:7]      nor4
-Xz2 rdbranch1_[0:1] rdbranch1_[2:3] rdbranch1_[4:5] rdbranch1_[6:7]
-+   rdbranch2_[0:1]                                             nand4 
-Xz3 rdbranch2_0 rdbranch2_1 z                                  nor2
+Xz1 rd1_[0:7]  rd1_[8:15] rd1_[16:23] rd1_[24:31] rdbranch1_[0:7] nor4
+Xz2 rdbranch1_[0:1] rdbranch1_[2:3] rdbranch1_[4:5] rdbranch1_[6:7] rdbranch2_[0:1] nand4 
+Xz3 rdbranch2_0 rdbranch2_1 z nor2
 
 *******************************************************************************
 * PCSEL, RA2SEL, BSEL, WDSEL multiplexers:
